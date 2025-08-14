@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Race Car — Moving with Lights</title>
+  <style>
+    :root{
+      --speed: 40;             /* 10–140 (higher is faster) */
+      --road-color: #2b2b2b;
+      --line-color: #eaeaea;
+      --sky-day: linear-gradient(#b3e5ff 20%, #e6f6ff 80%);
+      --sky-night: radial-gradient(circle at 50% 20%, #2c2c5a, #0e0e1a 60%);
+      --car-red: #e10600;
+      --car-dark: #111318;
+      --glass: #a7d3ff;
+      --neon: #8fd4ff;
+      --glow: 0 0 10px rgba(255,255,200,.9), 0 0 20px rgba(255,255,160,.9);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body{
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: #0f172a;
+      overflow: hidden; /* keep the stage clean */
+      background: var(--sky-day);
+      transition: background 600ms ease;
+    }
+
+    /* Controls */
+    .hud{
+      position: fixed; inset: 16px 16px auto 16px;
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      background: rgba(255,255,255,.75);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(0,0,0,.06);
+      border-radius: 16px; padding: 10px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    }
+    .hud label{ font-size: 12px; font-weight: 600; letter-spacing:.02em; }
+    .btn{
+      appearance: none; border: 0; padding: 10px 14px; border-radius: 999px;
+      background: #0f172a; color: #fff; font-weight: 700; cursor: pointer;
+      box-shadow: 0 6px 16px rgba(0,0,0,.15); transition: transform .05s ease;
+    }
+    .btn:active{ transform: translateY(1px) scale(.99); }
+    .toggle{ display: inline-flex; align-items: center; gap: 6px; }
+    .toggle input{ width: 44px; height: 24px; appearance: none; background: #cbd5e1; border-radius: 999px; position: relative; outline: none; cursor: pointer; transition: background .2s ease; }
+    .toggle input::after{ content:""; position:absolute; width:18px; height:18px; top:3px; left:3px; border-radius:50%; background:#fff; box-shadow: 0 2px 6px rgba(0,0,0,.25); transition: left .2s ease; }
+    .toggle input:checked{ background:#22c55e; }
+    .toggle input:checked::after{ left:23px; }
+    .slider{ appearance:none; height:6px; width:180px; border-radius:999px; background:#e5e7eb; outline:none; }
+    .slider::-webkit-slider-thumb{ appearance:none; width:18px; height:18px; border-radius:50%; background:#0f172a; cursor:pointer; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+
+    /* Stage */
+    .stage{
+      position: relative; width: 100vw; height: 100vh; overflow: hidden;
+    }
+
+    /* Parallax layers */
+    .layer{
+      position:absolute; left:0; top:0; right:0; bottom:0; pointer-events:none;
+      background-repeat: repeat-x; background-position: 0 100%; background-size: auto 100%;
+      animation-name: scroll; animation-timing-function: linear; animation-iteration-count: infinite;
+      animation-duration: calc(140s / var(--speed));
+    }
+    .mountains{ top: 0; height: 55%; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="240" viewBox="0 0 1200 240"><path d="M0 180 L120 120 L220 170 L320 90 L420 150 L520 80 L620 160 L740 110 L860 170 L980 120 L1100 160 L1200 130 L1200 240 L0 240 Z" fill="%2393c5fd"/></svg>'); opacity:.45; filter: saturate(.9); }
+    .trees{ top: 30%; height: 40%; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="200" viewBox="0 0 800 200"><g fill="%2334d399"><path d="M20 170 l20-60 20 60z"/><rect x="38" y="170" width="4" height="30" fill="%23222"/><path d="M160 170 l28-80 28 80z"/><rect x="186" y="170" width="6" height="30" fill="%23222"/><path d="M300 170 l22-70 22 70z"/><rect x="318" y="170" width="4" height="30" fill="%23222"/><path d="M460 170 l26-78 26 78z"/><rect x="484" y="170" width="4" height="30" fill="%23222"/><path d="M600 170 l20-60 20 60z"/><rect x="618" y="170" width="4" height="30" fill="%23222"/></g></svg>'); opacity:.5; animation-duration: calc(95s / var(--speed)); }
+
+    .road { position:absolute; left:0; right:0; bottom:0; height: 36vh; background: var(--road-color); box-shadow: 0 -10px 30px rgba(0,0,0,.25) inset; }
+    .lane{
+      position:absolute; left:0; right:0; bottom: 18vh; height:6px; background: repeating-linear-gradient(90deg, var(--line-color) 0 60px, transparent 60px 120px);
+      opacity:.9; filter: drop-shadow(0 2px 2px rgba(0,0,0,.3));
+      animation: scroll linear infinite; animation-duration: calc(30s / var(--speed));
+      background-size: 120px 6px; background-position: 0 0;
+    }
+
+    @keyframes scroll{ from { background-position-x: 0; } to { background-position-x: -1200px; } }
+
+    /* Car */
+    .car {
+      position: absolute; left: 50%; bottom: calc(18vh - 8px); transform: translateX(-50%);
+      width: min(78vmin, 880px); height: auto;
+      filter: drop-shadow(0 28px 24px rgba(0,0,0,.35));
+      transition: transform 120ms ease;
+    }
+    .car.fast { transform: translateX(-50%) translateY(-1px); }
+    .car.slam { animation: hop .25s ease; }
+    @keyframes hop{ 0%{ transform: translateX(-50%) translateY(0); } 50%{ transform: translateX(-50%) translateY(-6px);} 100%{ transform: translateX(-50%) translateY(0);} }
+
+    /* Wheel spin speed follows --speed */
+    .wheel { transform-origin: center; animation: spin linear infinite; animation-duration: calc(18s / var(--speed)); }
+    @keyframes spin { from { transform: rotate(0deg);} to{ transform: rotate(360deg);} }
+
+    /* Headlights & glow */
+    .beam { opacity: 0; transition: opacity .2s ease; }
+    .lights-on .beam { opacity: .75; }
+    .lights-on .headlamp { filter: drop-shadow(0 0 6px rgba(255,255,220,.9)) drop-shadow(0 0 16px rgba(255,255,160,.7)); }
+
+    /* Night mode */
+    body.night { color: #e5edff; background: var(--sky-night); }
+    body.night .hud{ background: rgba(15, 23, 42, .55); color:#e5edff; border-color: rgba(255,255,255,.1); }
+    body.night .trees{ opacity:.35; filter: hue-rotate(25deg) brightness(.7); }
+    body.night .mountains{ opacity:.25; filter: brightness(.6); }
+    body.night .lane{ opacity:.7; }
+
+    /* Footer credit */
+    .credit{ position: fixed; right: 14px; bottom: 10px; font-size: 11px; opacity:.65; }
+    .credit a{ color: currentColor; text-decoration: none; border-bottom: 1px dashed currentColor; }
+  </style>
+</head>
+<body>
+  <!-- Heads-up Display -->
+  <div class="hud" role="toolbar" aria-label="Controls">
+    <button id="play" class="btn" aria-pressed="true">⏸ Pause</button>
+    <label for="speed" style="margin-left:8px;">Speed</label>
+    <input id="speed" class="slider" type="range" min="10" max="140" value="40" step="1" aria-valuemin="10" aria-valuemax="140" aria-valuenow="40" aria-label="Speed">
+    <span id="kmh" style="min-width:70px; display:inline-block; text-align:right; font-variant-numeric: tabular-nums;">~120 km/h</span>
+
+    <label class="toggle" style="margin-left:12px;">
+      <input id="lights" type="checkbox" checked aria-label="Headlights">
+      <span>Lights</span>
+    </label>
+
+    <label class="toggle">
+      <input id="night" type="checkbox" aria-label="Night mode">
+      <span>Night</span>
+    </label>
+  </div>
+
+  <div class="stage">
+    <div class="layer mountains"></div>
+    <div class="layer trees" style="animation-duration: calc(70s / var(--speed));"></div>
+
+    <div class="road"></div>
+    <div class="lane"></div>
+
+    <!-- SVG Race Car -->
+    <svg id="racecar" class="car lights-on" viewBox="0 0 900 260" xmlns="http://www.w3.org/2000/svg" aria-label="Race car">
+      <!-- car shadow -->
+      <ellipse cx="450" cy="220" rx="300" ry="18" fill="rgba(0,0,0,.35)"/>
+
+      <!-- light beams -->
+      <g class="beam">
+        <defs>
+          <linearGradient id="beamGrad" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stop-color="rgba(255,255,180,.9)"/>
+            <stop offset="100%" stop-color="rgba(255,255,180,0)"/>
+          </linearGradient>
+        </defs>
+        <!-- left headlight beam -->
+        <polygon points="160,150 900,60 900,140" fill="url(#beamGrad)" opacity=".6"/>
+        <!-- right headlight beam -->
+        <polygon points="220,150 900,110 900,200" fill="url(#beamGrad)" opacity=".55"/>
+      </g>
+
+      <!-- body -->
+      <g>
+        <path d="M140 160 C 170 110, 250 80, 420 80 L 600 80 C 660 80, 710 100, 760 130 C 800 150, 820 170, 820 175 L 820 180 L 140 180 Z" fill="var(--car-dark)"/>
+        <path d="M150 160 C 180 115, 260 90, 420 90 L 600 90 C 660 90, 710 108, 760 135 C 800 155, 820 170, 820 175 L 820 180 L 150 180 Z" fill="var(--car-red)"/>
+        <path d="M360 92 L 560 92 C 590 92, 620 110, 640 130 L 310 130 C 320 110, 335 95, 360 92 Z" fill="var(--glass)" opacity=".85"/>
+        <rect x="300" y="130" width="360" height="18" rx="9" fill="#0b0d12" opacity=".65"/>
+        <!-- headlights -->
+        <circle class="headlamp" cx="170" cy="150" r="10" fill="#fffdd2"/>
+        <circle class="headlamp" cx="230" cy="150" r="10" fill="#fffdd2"/>
+        <!-- tail light -->
+        <rect x="805" y="150" width="10" height="18" rx="2" fill="#ff3950"/>
+        <rect x="798" y="155" width="7" height="10" rx="2" fill="#ff7a86" opacity=".9"/>
+      </g>
+
+      <!-- wheels -->
+      <g>
+        <g transform="translate(270,185)">
+          <circle r="38" fill="#0b0d12"/>
+          <circle r="28" fill="#1f2937"/>
+          <circle r="8" fill="#475569"/>
+          <g class="wheel">
+            <rect x="-4" y="-30" width="8" height="16" rx="2" fill="#a3a3a3"/>
+            <rect x="-4" y="14" width="8" height="16" rx="2" fill="#a3a3a3"/>
+            <rect x="14" y="-4" width="16" height="8" rx="2" fill="#a3a3a3"/>
+            <rect x="-30" y="-4" width="16" height="8" rx="2" fill="#a3a3a3"/>
+          </g>
+        </g>
+        <g transform="translate(640,185)">
+          <circle r="38" fill="#0b0d12"/>
+          <circle r="28" fill="#1f2937"/>
+          <circle r="8" fill="#475569"/>
+          <g class="wheel">
+            <rect x="-4" y="-30" width="8" height="16" rx="2" fill="#a3a3a3"/>
+            <rect x="-4" y="14" width="8" height="16" rx="2" fill="#a3a3a3"/>
+            <rect x="14" y="-4" width="16" height="8" rx="2" fill="#a3a3a3"/>
+            <rect x="-30" y="-4" width="16" height="8" rx="2" fill="#a3a3a3"/>
+          </g>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <div class="credit">Built with HTML/CSS/SVG/JS — free to copy.</div>
+
+  <script>
+    const root = document.documentElement;
+    const body = document.body;
+    const car = document.getElementById('racecar');
+
+    const playBtn = document.getElementById('play');
+    const speed = document.getElementById('speed');
+    const kmh = document.getElementById('kmh');
+    const lights = document.getElementById('lights');
+    const night = document.getElementById('night');
+
+    let playing = true;
+
+    // Update speed and related UI
+    function setSpeed(val){
+      root.style.setProperty('--speed', val);
+      const approx = Math.round(val * 3);
+      kmh.textContent = `~${approx} km/h`;
+      car.classList.toggle('fast', val > 90);
+    }
+
+    // Initialize
+    setSpeed(speed.value);
+
+    // Events
+    speed.addEventListener('input', (e)=> setSpeed(e.target.value));
+
+    playBtn.addEventListener('click', ()=>{
+      playing = !playing;
+      document.querySelectorAll('.layer, .lane, .wheel').forEach(el=>{
+        el.style.animationPlayState = playing ? 'running' : 'paused';
+      });
+      playBtn.textContent = playing ? '⏸ Pause' : '▶️ Play';
+      car.classList.toggle('slam');
+      setTimeout(()=> car.classList.remove('slam'), 260);
+    });
+
+    lights.addEventListener('change', (e)=>{
+      car.classList.toggle('lights-on', e.target.checked);
+    });
+
+    night.addEventListener('change', (e)=>{
+      body.classList.toggle('night', e.target.checked);
+    });
+
+    // Keyboard shortcuts: space to pause, L for lights, N for night
+    window.addEventListener('keydown', (e)=>{
+      if(e.code === 'Space'){ e.preventDefault(); playBtn.click(); }
+      if(e.key === 'l' || e.key === 'L'){ lights.checked = !lights.checked; lights.dispatchEvent(new Event('change')); }
+      if(e.key === 'n' || e.key === 'N'){ night.checked = !night.checked; night.dispatchEvent(new Event('change')); }
+    });
+  </script>
+</body>
+</html>
