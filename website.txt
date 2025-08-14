@@ -6,7 +6,7 @@
   <title>Race Car — Moving with Lights</title>
   <style>
     :root{
-      --speed: 40;             /* 10–140 (higher is faster) */
+      --speed: 100;             /* 10–140 (higher is faster) */
       --road-color: #2b2b2b;
       --line-color: #eaeaea;
       --sky-day: linear-gradient(#b3e5ff 20%, #e6f6ff 80%);
@@ -253,3 +253,4 @@
   </script>
 </body>
 </html>
+
