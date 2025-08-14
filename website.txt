@@ -7,7 +7,7 @@
   <style>
     :root{
       --speed: 40;             /* 10–140 (higher is faster) */
-      --road-color: #2b2b2b;
+      --road-color: green;
       --line-color: #eaeaea;
       --sky-day: linear-gradient(#b3e5ff 20%, #e6f6ff 80%);
       --sky-night: radial-gradient(circle at 50% 20%, #2c2c5a, #0e0e1a 60%);
@@ -253,3 +253,4 @@
   </script>
 </body>
 </html>
+
