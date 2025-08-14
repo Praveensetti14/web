@@ -6,7 +6,7 @@
   <title>Light On/Off</title>
   <style>
     :root{
-      --bg-dark:#0f172a;      /* night */
+      --bg-dark:#0f172a;      /* night moon */
       --bg-light:#f8fafc;     /* day */
       --room:#111827;         /* wall base */
       --glow:#fff9c4;         /* light color */
@@ -144,9 +144,10 @@
 
     // Keyboard shortcuts
     window.addEventListener('keydown', (e)=>{
-      if(e.code === 'Space'){ e.preventDefault(); flip(); }
+      if(e.code === 'space'){ e.preventDefault(); flip(); }
       if(e.key === 'l' || e.key === 'L'){ flip(); }
     });
   </script>
 </body>
 </html>
+
